@@ -1,9 +1,13 @@
 from django.shortcuts import get_object_or_404
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework import filters, mixins, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import (
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 
 from api.permissions import IsAuthorOrReadOnly
-from posts.models import Follow, Group, Post
+from posts.models import Group, Post
 
 from .serializers import (
     CommentSerializer,
@@ -18,7 +22,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
     queryset = Post.objects.select_related('author', 'group').all()
     serializer_class = PostSerializer
-    permission_classes = (IsAuthorOrReadOnly,)
+    permission_classes = (IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly)
+    pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         """При создании поста
@@ -38,7 +43,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     """Здесь работаю с комментариями конкретного поста"""
 
     serializer_class = CommentSerializer
-    permission_classes = (IsAuthorOrReadOnly,)
+    permission_classes = (IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly)
 
     def get_post(self):
         """Сначала достаю пост из url, к которому относятся комментарии"""
@@ -70,9 +75,7 @@ class FollowViewSet(
 
     def get_queryset(self):
         """Показываю только подписки текущего пользователя"""
-        return Follow.objects.select_related(
-            'user', 'following'
-        ).filter(user=self.request.user)
+        return self.request.user.follower.select_related('user', 'following')
 
     def perform_create(self, serializer):
         """При создании подписки сам записываю текущего пользователя"""
